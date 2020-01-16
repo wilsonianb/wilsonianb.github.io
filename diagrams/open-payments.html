@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+  sequenceDiagram
+    participant Sender
+    participant Issuer as Issuer<br/>(sending wallet)
+    participant Acquirer as Acquirer<br/>(receiving wallet)
+    participant Receiver
+    opt unsolicited payment (web monetization, etc)
+        activate Sender
+        Sender->>Issuer: send(payment_pointer, amount)
+        activate Issuer
+        Issuer->>Acquirer: POST /sources
+        activate Acquirer
+        Acquirer->>Acquirer: createSource(payment_pointer)
+        Acquirer-->>Issuer: 201 destination_address, shared_secret
+        deactivate Acquirer
+        rect rgb(0, 255, 0)
+            Issuer->>Acquirer: [ push payment ]
+            activate Acquirer
+        end
+        Acquirer->>Acquirer: increaseSourcePaidBalance(amount)
+        deactivate Acquirer
+        Issuer-->>Sender: response
+        deactivate Issuer
+        deactivate Sender
+    end
+    alt immediate one time payment
+        activate Receiver
+        activate Receiver
+        activate Receiver
+        Receiver->>Acquirer: POST /invoices
+        activate Acquirer
+        activate Acquirer
+        activate Acquirer
+        Acquirer->>Acquirer: createInvoice(invoice)
+        alt with Sender's payment pointer
+            Acquirer->>Acquirer: getSource(payment_pointer)
+            alt !!source && source.balance >= invoice.amount
+                Acquirer->>Acquirer: increaseSourceUsedBalance(amount)<br/>updateInvoiceBalance(amount)
+                Acquirer-->>Receiver: 201 paid=true
+                deactivate Acquirer
+                deactivate Receiver
+            else
+                Note right of Issuer: Include invoice_url or<br/>full invoice details?
+                Acquirer ->> Issuer: POST /mandates invoice
+                activate Issuer
+                Issuer -x Sender: [ prompt for authorization ]
+                activate Sender
+                Issuer -->> Acquirer: 201?
+                deactivate Issuer
+                Acquirer-->>Receiver: 201 paid=false
+                deactivate Acquirer
+                deactivate Receiver
+                Sender --x Issuer: "Make it so"
+                activate Issuer
+                deactivate Sender
+                Note right of Issuer: Should this be<br/>supported by the<br/>/mandates controller,<br/>or should the invoice<br/>be sent to a<br/>different endpoint?
+                Issuer->>Acquirer: GET invoice_url
+                activate Acquirer
+                Acquirer-->>Issuer: 200 destination_address, shared_secret
+                deactivate Acquirer
+                rect rgb(0, 255, 0)
+                    Issuer->>Acquirer: [ push payment ]
+                    activate Acquirer
+                end
+                deactivate Issuer
+                Acquirer->>Acquirer: updateInvoiceBalance(amount)
+                deactivate Acquirer
+            end
+        else no payment pointer
+            Acquirer-->>Receiver: 201 paid=false
+            deactivate Acquirer
+            Receiver-xSender: [ send invoice_url out of band (PaymentRequest, etc) ]
+            deactivate Receiver
+            activate Sender
+            Sender->>Issuer: pay(invoice_url)
+            activate Issuer
+            Issuer->>Acquirer: GET invoice_url
+            activate Acquirer
+            Acquirer-->>Issuer: 200 destination_address, shared_secret
+            deactivate Acquirer
+            rect rgb(0, 255, 0)
+                Issuer->>Acquirer: [ push payment ]
+                activate Acquirer
+            end
+            Acquirer->>Acquirer: updateInvoiceBalance(amount)
+            deactivate Acquirer
+            Issuer-->>Sender: response
+            deactivate Sender
+            deactivate Issuer
+        end
+    else delayed and/or recurring payment
+        activate Receiver
+        activate Receiver
+        Receiver->>Acquirer: POST /invoices
+        activate Acquirer
+        activate Acquirer
+        Acquirer->>Acquirer: createInvoice(invoice)
+        alt with Sender's payment pointer
+            deactivate Receiver
+            Acquirer ->> Issuer: POST /mandates invoice
+            activate Issuer
+            Issuer ->> Issuer: createMandate(invoice)
+            Issuer -x Sender: [ prompt for authorization ]
+            activate Sender
+            Issuer -->> Acquirer: 201
+            deactivate Issuer
+            Acquirer-->>Receiver: 201
+            deactivate Acquirer
+            Sender --x Issuer: "Ok, until I say it's not ok"
+            deactivate Sender
+            activate Issuer
+            Issuer ->> Issuer: setMandateAuthorized(true)
+            deactivate Issuer
+        else no payment pointer
+            Acquirer-->>Receiver: 201
+            deactivate Acquirer
+            Receiver-xSender: [ send invoice_url out of band (PaymentRequest, etc) ]
+            deactivate Receiver
+            activate Sender
+            Sender->>Issuer: pay(invoice_url)
+            activate Issuer
+            Issuer ->> Issuer: createMandate(invoice)
+            Issuer ->> Acquirer: PUT invoice_url mandate_url?
+            activate Acquirer
+            Acquirer->>Acquirer: setInvoiceMandate(mandate_url)
+            deactivate Acquirer
+            Issuer-->>Sender: response
+            deactivate Sender
+            deactivate Issuer
+        end
+        loop invoice.interval
+            activate Acquirer
+            Acquirer->>Acquirer: getSource(payment_pointer)
+            alt !!source && source.balance >= invoice.amount
+                Acquirer->>Acquirer: increaseSourceUsedBalance(amount)
+            else
+                rect rgb(0, 255, 0)
+                    Acquirer->>Issuer: [ pull payment ]
+                    activate Issuer
+                    Issuer-->>Acquirer: $
+                    deactivate Issuer
+                end
+                Acquirer->>Acquirer: updateInvoiceBalance(amount)
+                deactivate Acquirer
+            end
+        end
+    end
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
+</body>
+</html>
