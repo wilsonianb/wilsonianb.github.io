@@ -18,7 +18,7 @@
     end
     User->>Site: deployment details
     Note right of Site: CodiusDeployment <br/>is a k8s custom<br/>resource with same <br/>fields as codius <br/>manifest
-    Site->>k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer <jwt><br/>codius-deployment.yaml
+    Site->>k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer jwt<br/>codius-deployment.yaml
     activate k8s
     activate k8s
     Note right of k8s: token sent in k8s<br/>"TokenReview"
