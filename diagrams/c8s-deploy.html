@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+  sequenceDiagram
+    participant User
+    participant Site as codius-host.com
+    participant k8s as Kubernetes
+    participant Auth as Webhook Token<br/>Auth Server
+    participant Wallet as Host's Wallet
+    activate User
+    activate Site
+    opt web monetization
+      User->>Wallet: $$$
+    end
+    User->>Site: deployment details
+    Note right of Site: CodiusDeployment <br/>is a k8s custom<br/>resource with same <br/>fields as codius <br/>manifest
+    Site->>k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer <jwt><br/>codius-deployment.yaml
+    activate k8s
+    activate k8s
+    Note right of k8s: token sent in k8s<br/>"TokenReview"
+    k8s->>Auth: jwt
+    activate Auth
+    activate Auth
+    Auth->>Wallet: /spend amount
+    activate Wallet
+    activate Wallet
+    alt 404 || balance < amount
+      Wallet-->>Auth: 400?
+      deactivate Wallet
+      Auth-->>k8s: 401 "authenticated": false
+      deactivate Auth
+      k8s-->>Site: 401
+      deactivate k8s
+      Site-->>User: "Pay me"
+    else
+      Wallet-->>Auth: 200
+      deactivate Wallet
+      Note right of k8s: returned user is <br/>authorized to create <br/>CodiusDeployments
+      Auth-->>k8s: 200 "user":"codius-deploy"
+      deactivate Auth
+      k8s->>k8s: create CodiusDeployment
+      k8s->>k8s: crd operator creates deployment, service, ingress, etc
+      k8s-->>Site: 301
+      deactivate k8s
+      Site-->>User: "Success"
+    end
+    deactivate Site
+    deactivate User
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
+</body>
+</html>
