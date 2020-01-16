@@ -12,12 +12,12 @@
     participant Auth as External<br/>Auth Server
     participant Wallet as Host's Wallet
     participant Deployment as Codius Deployment
+    User->>Site: [ navigates ]
     activate User
     activate Site
     opt web monetization
       User->>Wallet: $$$
     end
-    User->>Site: [ navigates ]
     Note right of Site: codius deployment <br/>is loaded in iframe
     Site->>Ingress: GET proxy-hash.codius-host.com<br/>Authorization: Bearer jwt
     activate Ingress
