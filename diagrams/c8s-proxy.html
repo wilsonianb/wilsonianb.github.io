@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+  sequenceDiagram
+    participant User
+    participant Site as hash.codius-host.com
+    participant Ingress
+    participant Auth as External<br/>Auth Server
+    participant Wallet as Host's Wallet
+    participant Deployment as Codius Deployment
+    activate User
+    activate Site
+    opt web monetization
+      User->>Wallet: $$$
+    end
+    User->>Site: [ navigates ]
+    Note right of Site: codius deployment <br/>is loaded in iframe
+    Site->>Ingress: GET proxy-hash.codius-host.com<br/>Authorization: Bearer <jwt>
+    activate Ingress
+    activate Ingress
+    Ingress->>Auth: jwt
+    activate Auth
+    activate Auth
+    Auth->>Wallet: /spend amount
+    activate Wallet
+    activate Wallet
+    alt 404 || balance < amount
+      Wallet-->>Auth: 400?
+      deactivate Wallet
+      Auth-->>Ingress: 401
+      deactivate Auth
+      Ingress-->>Site: 401
+      deactivate Ingress
+      Site-->>User: "Pay me"
+    else
+      Wallet-->>Auth: 200
+      deactivate Wallet
+      Auth-->>Ingress: 200
+      deactivate Auth
+      Ingress->>Deployment: request
+      deactivate Ingress
+      activate Deployment
+      Deployment-->>Site: response
+      deactivate Ingress
+      Site-->>User: [ displays iframe ]
+    end
+    deactivate Site
+    deactivate User
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
+</body>
+</html>
