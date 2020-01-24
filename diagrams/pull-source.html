@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+sequenceDiagram
+    participant Sender
+    participant Issuer as Issuer<br/>(sending wallet)
+    participant Acquirer as Acquirer<br/>(receiving wallet)
+    participant Receiver
+
+    Sender->>Receiver: Produce $PaymentPointer
+
+    Receiver->>Issuer: Get Open Payments Metadata
+
+    Receiver->>Issuer: POST /mandates
+    activate Receiver
+    activate Issuer
+    Issuer->>Issuer: Create Mandate
+    Issuer-->>Receiver: 201 Response
+    deactivate Issuer
+    deactivate Receiver
+
+    Receiver->>Issuer: Authorise Mandate
+    activate Receiver
+    activate Issuer
+    
+    Issuer->>Sender: Mandate Consent
+    activate Sender
+    Sender-->>Issuer: Accept Mandate
+    deactivate Sender
+
+    Issuer-->>Receiver: Respond Auth Tokens
+    deactivate Receiver
+    deactivate Issuer
+
+    loop Interval of Payment
+
+        activate Receiver
+        Receiver->>Receiver: createInvoice(invoice)
+        Receiver->>Issuer: POST /mandates/{id}/spend (payment_pointer, amount, auth_token)
+        activate Issuer
+
+        Issuer->>Acquirer: POST /sources public_key
+        activate Acquirer
+        Acquirer-->>Issuer: 201 destination_address, shared_secret
+        deactivate Acquirer
+        rect rgb(0, 255, 0)
+            Issuer->>Acquirer: [ push payment ]
+            activate Acquirer
+        end
+        Acquirer->>Acquirer: updateSourceBalance(amount)
+        deactivate Acquirer
+
+        Issuer->>Issuer: createJWT(source_url)
+        Issuer-->>Receiver: 200 JWT
+        deactivate Receiver
+        deactivate Issuer
+
+        activate Receiver
+        Receiver->>Receiver: validateToken(JWT)
+        Receiver->>Acquirer: POST /sources/{id}/spend (invoice_amount)
+        activate Acquirer
+        Acquirer-->>Receiver: 200
+        deactivate Receiver
+        deactivate Acquirer
+    end
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
+</body>
+</html>
