@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+sequenceDiagram
+
+participant Sender
+participant Verifier
+participant Receiver
+
+Activate Verifier
+Verifier-x+Sender: payment pointer
+Deactivate Verifier
+Sender->>+Verifier: SPSP query
+Verifier->>+Receiver: SPSP query w/ receipt secret & nonce
+Note right of Receiver: Encrypts secret and<br/>nonce, and adds to<br/>destination address
+Receiver-->>-Verifier: 200 destination_address, shared_secret
+Verifier-->>-Sender: 200 destination_address, shared_secret
+
+Sender->>+Receiver: create connection stream
+
+loop micropayment
+  Sender->>Receiver: ILP Prepare
+  Note right of Receiver: Creates hmac with<br/>stream id, nonce,<br/>total stream amount,<br/> stream start time,<br/>and receipt secret
+  Receiver-->>Sender: ILP Fulfill w/ receipt frame
+  Sender-x+Verifier: receipt
+  Note right of Verifier: Recreates secret<br/>from seed & nonce.<br/>Verifies hmac.<br/>Checks stream start<br/>time and amount.
+  Deactivate Verifier
+end
+
+Sender->>Receiver: close connection stream
+deactivate Receiver
+deactivate Sender
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
+</body>
+</html>
