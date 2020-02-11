@@ -5,51 +5,48 @@
 </head>
 <body>
   <div class="mermaid">
-  sequenceDiagram
-    participant User
-    participant Site as hash.codius-host.com
-    participant Ingress
-    participant Auth as External<br/>Auth Server
-    participant Wallet as Host's Wallet
-    participant Deployment as Codius Deployment
-    User->>Site: [ navigates ]
-    activate User
-    activate Site
+sequenceDiagram
+  participant Browser
+  participant Ingress
+  participant Auth as External<br/>Auth Server
+  participant CodiusWeb as pay.host
+  participant SPSP as Host SPSP
+  participant Wallet as Host's Wallet
+  participant Deployment as Codius Deployment
+
+  activate Browser
+  Browser->>+Ingress: GET hash.host
+  activate Ingress
+  Ingress->>+Auth: request
+  activate Auth
+  Note right of Auth: Checks service<br/>balance
+  alt sufficient balance
+    Auth-->>-Ingress: 200
+    Ingress->>+Deployment: request
+    deactivate Ingress
+    Deployment-->>-Browser: response
+  else insufficient balance
+    Auth-->>-Browser: 402 pay.host/request=hash.host page w/ meta tag
+    deactivate Ingress
     opt web monetization
-      User->>Wallet: $$$
+      Browser->>+SPSP: SPSP query
+      SPSP->>+Wallet: SPSP query w/ secret & nonce
+      Wallet-->>-Browser: destinationAddress & sharedSecret
+      deactivate SPSP
+      loop ILP packet
+        Browser->>+Wallet: $
+        Wallet-->>-Browser: receipt
+        Browser-x+CodiusWeb: monetizationprogress receipt
+        CodiusWeb->>+Auth: POST hash, receipt
+        Auth->>Auth: credits hash balance
+        Auth-->>-CodiusWeb: hash balance
+        alt sufficient balance
+          CodiusWeb->>-CodiusWeb: iframe src=hash.host
+        end
+      end
     end
-    Note right of Site: codius deployment <br/>is loaded in iframe
-    Site->>Ingress: GET proxy-hash.codius-host.com<br/>Authorization: Bearer jwt
-    activate Ingress
-    activate Ingress
-    Ingress->>Auth: jwt
-    activate Auth
-    activate Auth
-    Auth->>Wallet: /spend amount
-    activate Wallet
-    activate Wallet
-    alt 404 || balance < amount
-      Wallet-->>Auth: 400?
-      deactivate Wallet
-      Auth-->>Ingress: 401
-      deactivate Auth
-      Ingress-->>Site: 401
-      deactivate Ingress
-      Site-->>User: "Pay me"
-    else
-      Wallet-->>Auth: 200
-      deactivate Wallet
-      Auth-->>Ingress: 200
-      deactivate Auth
-      Ingress->>Deployment: request
-      deactivate Ingress
-      activate Deployment
-      Deployment-->>Site: response
-      deactivate Ingress
-      Site-->>User: [ displays iframe ]
-    end
-    deactivate Site
-    deactivate User
+  end
+  deactivate Browser
   </div>
   <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
 </body>
