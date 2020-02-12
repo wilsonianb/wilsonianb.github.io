@@ -5,86 +5,48 @@
 </head>
 <body>
   <div class="mermaid">
-  sequenceDiagram
-    participant User
+sequenceDiagram
+    participant Browser
     participant Site as codius-host.com
     participant Ingress
-    participant Auth as External<br/>Auth Server
     participant Dashboard as Kubernetes<br/>Dashboard
     participant k8s as Kubernetes
     participant k8sAuth as Webhook Token<br/>Auth Server
+    participant SPSP as Host SPSP
     participant Wallet as Host's Wallet
 
-    User->>Site: [ navigates ]
-    activate User
-    activate Site
+    activate Browser
+    Browser->>+Ingress: GET codius-host.com
+    Ingress-->>-Browser: codius-host.com page w/ meta tag
     opt web monetization
-      User->>Wallet: $$$
+      Browser->>+SPSP: SPSP query
+      SPSP->>+Wallet: SPSP query w/ secret & nonce
+      Wallet-->>-Browser: destinationAddress & sharedSecret
+      deactivate SPSP
+      loop ILP packet
+        Browser->>+Wallet: $
+        Wallet-->>-Browser: receipt
+        Browser-x+Site: monetizationprogress receipt
+        Site-x+k8sAuth: POST monetizationId, receipt
+        k8sAuth->>k8sAuth: credits monetizationId balance
+        deactivate k8sAuth
+      end
+      Site->>-Site: iframe src=dashboard.codius-host.com/monetizationId={id}
+      Browser->>+Ingress: GET dashboard.codius-host.com/monetizationId={id}
+      Ingress-->>-Browser: Kubernetes dashboard ui w/ monetizationId header
+      Browser->>+Dashboard: deploy service
+      Dashboard->>+k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer monetizationId<br/>codius-deployment.yaml
+      k8s->>+k8sAuth: monetizationId
+      k8sAuth->>k8sAuth: checks id balance
+      alt sufficient balance
+        k8sAuth-->>-k8s: 200 "user":"codius-deploy"
+        k8s->>k8s: create CodiusDeployment
+        k8s->>k8s: crd operator creates deployment, service, ingress, etc
+        k8s-->>-Dashboard: 201
+        Dashboard-->>-Browser: "Success"
+      end
     end
-    Note right of Site: Kubernetes dashboard <br/>is loaded in iframe
-    Site->>Ingress: GET /dashboard<br/>Authorization: Bearer jwt
-    activate Ingress
-    activate Ingress
-    Ingress->>Auth: jwt
-    activate Auth
-    activate Auth
-    Auth->>Wallet: /spend amount
-    activate Wallet
-    activate Wallet
-    alt 404 || balance < amount
-      Wallet-->>Auth: 400?
-      deactivate Wallet
-      Auth-->>Ingress: 401
-      deactivate Auth
-      Ingress-->>Site: 401
-      deactivate Ingress
-      Site-->>User: "Pay me"
-    else
-      Wallet-->>Auth: 200
-      deactivate Wallet
-      Auth-->>Ingress: 200
-      deactivate Auth
-      Ingress->>Dashboard: request
-      deactivate Ingress
-      activate Dashboard
-      Dashboard-->>Site: response
-      Site-->>User: [ displays iframe ]
-    end
-    User->>Dashboard: deployment details
-    Note right of Site: CodiusDeployment <br/>is a k8s custom<br/>resource with same <br/>fields as codius <br/>manifest
-    Dashboard->>k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer jwt<br/>codius-deployment.yaml
-    activate k8s
-    activate k8s
-    Note right of k8s: token sent in k8s<br/>"TokenReview"
-    k8s->>k8sAuth: jwt
-    activate k8sAuth
-    activate k8sAuth
-    k8sAuth->>Wallet: /spend amount
-    activate Wallet
-    activate Wallet
-    alt 404 || balance < amount
-      Wallet-->>k8sAuth: 400?
-      deactivate Wallet
-      k8sAuth-->>k8s: 401 "Authenticated": false
-      deactivate k8sAuth
-      k8s-->>Dashboard: 401
-      deactivate k8s
-      Dashboard-->>User: "Unauthenticated "
-    else
-      Wallet-->>k8sAuth: 200
-      deactivate Wallet
-      Note right of k8s: returned user is <br/>Authorized to create <br/>CodiusDeployments
-      k8sAuth-->>k8s: 200 "user":"codius-deploy"
-      deactivate k8sAuth
-      k8s->>k8s: create CodiusDeployment
-      k8s->>k8s: crd operator creates deployment, service, ingress, etc
-      k8s-->>Dashboard: 301
-      deactivate k8s
-      Dashboard-->>User: "Success"
-    end
-    deactivate Site
-    deactivate Dashboard
-    deactivate User
+    deactivate Browser
   </div>
   <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
 </body>
