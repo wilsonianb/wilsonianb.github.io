@@ -19,7 +19,7 @@ sequenceDiagram
   activate Ingress
   Ingress->>+Auth: request
   activate Auth
-  Note right of Auth: Checks service<br/>balance
+  Auth->>Auth: checks hash balance
   alt sufficient balance
     Auth-->>-Ingress: 200
     Ingress->>+Deployment: request
