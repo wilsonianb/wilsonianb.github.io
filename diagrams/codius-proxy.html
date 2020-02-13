@@ -9,8 +9,8 @@ sequenceDiagram
   participant Browser
   participant Ingress
   participant Auth as External<br/>Auth Server
-  participant CodiusWeb as pay.host
-  participant SPSP as Host SPSP
+  participant Verifier as Receipt Verifier
+  participant Site as pay.host
   participant Wallet as Host's Wallet
   participant Deployment as Codius Deployment
 
@@ -19,29 +19,34 @@ sequenceDiagram
   activate Ingress
   Ingress->>+Auth: request
   activate Auth
-  Auth->>Auth: checks hash balance
+  Auth->>+Verifier: POST /receipts/{hash}/spend
+  activate Verifier
   alt sufficient balance
+    Verifier-->>-Auth: 200
     Auth-->>-Ingress: 200
     Ingress->>+Deployment: request
     deactivate Ingress
     Deployment-->>-Browser: response
   else insufficient balance
+    Verifier-->>-Auth: 400
     Auth-->>-Browser: 402 pay.host/request=hash.host page w/ meta tag
     deactivate Ingress
     opt web monetization
-      Browser->>+SPSP: SPSP query
-      SPSP->>+Wallet: SPSP query w/ secret & nonce
+      Browser->>+Site: parse monetization meta tag
+      Site-->>-Browser: $host/{hash} payment pointer
+      Browser->>+Verifier: SPSP query
+      Verifier->>+Wallet: SPSP query w/ secret & nonce=hash
       Wallet-->>-Browser: destinationAddress & sharedSecret
-      deactivate SPSP
+      deactivate Verifier
       loop ILP packet
         Browser->>+Wallet: $
         Wallet-->>-Browser: receipt
-        Browser-x+CodiusWeb: monetizationprogress receipt
-        CodiusWeb->>+Auth: POST hash, receipt
-        Auth->>Auth: credits hash balance
-        Auth-->>-CodiusWeb: hash balance
+        Browser-x+Site: monetizationprogress receipt
+        Site->>+Verifier: POST /receipts receipt
+        Verifier->>Verifier: credits hash balance
+        Verifier-->>-Site: 200 hash balance
         alt sufficient balance
-          CodiusWeb->>-CodiusWeb: iframe src=hash.host
+          Site->>-Site: iframe src=hash.host
         end
       end
     end

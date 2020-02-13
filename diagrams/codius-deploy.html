@@ -7,38 +7,42 @@
   <div class="mermaid">
 sequenceDiagram
     participant Browser
-    participant Site as codius-host.com
     participant Ingress
+    participant Site as codius-host.com
+    participant Verifier as Receipt Verifier
+    participant Wallet as Host's Wallet
     participant Dashboard as Kubernetes<br/>Dashboard
     participant k8s as Kubernetes
     participant k8sAuth as Webhook Token<br/>Auth Server
-    participant SPSP as Host SPSP
-    participant Wallet as Host's Wallet
 
     activate Browser
     Browser->>+Ingress: GET codius-host.com
     Ingress-->>-Browser: codius-host.com page w/ meta tag
     opt web monetization
-      Browser->>+SPSP: SPSP query
-      SPSP->>+Wallet: SPSP query w/ secret & nonce
+      Browser->>+Site: parse monetization meta tag
+      Site-->>-Browser: payment pointer
+      Browser->>+Verifier: SPSP query Web-Monetization-Id: requestId
+      Verifier->>+Wallet: SPSP query w/ secret & nonce=requestId
       Wallet-->>-Browser: destinationAddress & sharedSecret
-      deactivate SPSP
+      deactivate Verifier
       loop ILP packet
         Browser->>+Wallet: $
         Wallet-->>-Browser: receipt
         Browser-x+Site: monetizationprogress receipt
-        Site-x+k8sAuth: POST monetizationId, receipt
-        k8sAuth->>k8sAuth: credits monetizationId balance
-        deactivate k8sAuth
+        Site-x+Verifier: POST /receipts receipt
+        deactivate Site
+        Verifier->>-Verifier: credits requestId balance
       end
-      Site->>-Site: iframe src=dashboard.codius-host.com/monetizationId={id}
-      Browser->>+Ingress: GET dashboard.codius-host.com/monetizationId={id}
-      Ingress-->>-Browser: Kubernetes dashboard ui w/ monetizationId header
+      Browser-x+Site: monetizationstart requestId
+      Site->>-Site: iframe src=dashboard.codius-host.com/auth=requestId
+      Browser->>+Ingress: GET dashboard.codius-host.com/auth=requestId
+      Ingress-->>-Browser: Kubernetes dashboard ui w/ requestId as Auth header
       Browser->>+Dashboard: deploy service
-      Dashboard->>+k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer monetizationId<br/>codius-deployment.yaml
-      k8s->>+k8sAuth: monetizationId
-      k8sAuth->>k8sAuth: checks id balance
+      Dashboard->>+k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer requestId<br/>codius-deployment.yaml
+      k8s->>+k8sAuth: requestId
+      k8sAuth->>+Verifier: POST /receipts/{requestId}/spend
       alt sufficient balance
+        Verifier-->>-k8sAuth: 200
         k8sAuth-->>-k8s: 200 "user":"codius-deploy"
         k8s->>k8s: create CodiusDeployment
         k8s->>k8s: crd operator creates deployment, service, ingress, etc
