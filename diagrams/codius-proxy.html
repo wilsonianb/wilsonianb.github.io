@@ -32,21 +32,19 @@ sequenceDiagram
     Auth-->>-Browser: 402 pay.host/request=hash.host page w/ meta tag
     deactivate Ingress
     opt web monetization
-      Browser->>+Site: parse monetization meta tag
-      Site-->>-Browser: $host/{hash} payment pointer
       Browser->>+Verifier: SPSP query
-      Verifier->>+Wallet: SPSP query w/ secret & nonce=hash
+      Verifier->>+Wallet: SPSP query w/ secret & nonce
       Wallet-->>-Browser: destinationAddress & sharedSecret
       deactivate Verifier
       loop ILP packet
         Browser->>+Wallet: $
         Wallet-->>-Browser: receipt
         Browser-x+Site: monetizationprogress receipt
-        Site->>+Verifier: POST /receipts receipt
+        Site->>+Verifier: POST /receipts/{hash} receipt
         Verifier->>Verifier: credits hash balance
         Verifier-->>-Site: 200 hash balance
         alt sufficient balance
-          Site->>-Site: iframe src=hash.host
+          Site->>-Browser: redirect to hash.host
         end
       end
     end

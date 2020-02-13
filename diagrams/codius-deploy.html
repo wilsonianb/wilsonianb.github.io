@@ -19,17 +19,15 @@ sequenceDiagram
     Browser->>+Ingress: GET codius-host.com
     Ingress-->>-Browser: codius-host.com page w/ meta tag
     opt web monetization
-      Browser->>+Site: parse monetization meta tag
-      Site-->>-Browser: payment pointer
-      Browser->>+Verifier: SPSP query Web-Monetization-Id: requestId
-      Verifier->>+Wallet: SPSP query w/ secret & nonce=requestId
+      Browser->>+Verifier: SPSP query
+      Verifier->>+Wallet: SPSP query w/ secret & nonce
       Wallet-->>-Browser: destinationAddress & sharedSecret
       deactivate Verifier
       loop ILP packet
         Browser->>+Wallet: $
         Wallet-->>-Browser: receipt
         Browser-x+Site: monetizationprogress receipt
-        Site-x+Verifier: POST /receipts receipt
+        Site-x+Verifier: POST /receipts/{requestId} receipt
         deactivate Site
         Verifier->>-Verifier: credits requestId balance
       end
