@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="https://unpkg.com/mermaid@8.4.8/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      theme: "neutral",
+      startOnLoad: true,
+      sequence: {
+        mirrorActors: false
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="mermaid">
+sequenceDiagram
+autonumber
+participant Receiver as WM Receiver<br/>(Website's Wallet)
+participant Verifier as Receipt Verifier
+participant Page as Web Page
+participant Browser as User Agent<br/>(Browser)
+participant Sender as WM Sender<br/>(User's Wallet)
+
+Browser-->>Page: [parse monetization meta tag]
+Browser->>Browser: Calculate Rate (url)
+Browser-->>Page: [generate session id]
+Browser->>Verifier: Get Receiver Address & Secret (paymentPointer)
+Verifier->>Receiver: Get Receiver Address & Secret (paymentPointer, receiptSecret)
+loop Streaming Micropayments (throughput possibly limited by WM Sender)
+  Browser->>+Sender: Send Payment (receiverAddress, amount)
+  Sender->>+Receiver: Send Payment (amount)
+  Receiver-->>-Sender: Send Receipt (amount)
+  Sender->>-Browser: Payment Sent (amount, receipt)
+  Browser->>Page: Payment Sent (sessionId, amount, receipt)
+  opt Confirm Payments
+    Page->>Verifier: Verify Payment (receipt)
+  end
+end
+  </div>
+</body>
+</html>
