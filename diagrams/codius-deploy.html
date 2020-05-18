@@ -6,18 +6,19 @@
 <body>
   <div class="mermaid">
 sequenceDiagram
+    participant User
     participant Browser
-    participant Ingress
+    participant kubectl
     participant Site as codius-host.com
     participant Verifier as Receipt Verifier
     participant Wallet as Host's Wallet
-    participant Dashboard as Kubernetes<br/>Dashboard
     participant k8s as Kubernetes
-    participant k8sAuth as Webhook Token<br/>Auth Server
+    participant k8sAuth as Authentication<br/>Token Webhook
 
-    activate Browser
-    Browser->>+Ingress: GET codius-host.com
-    Ingress-->>-Browser: codius-host.com page w/ meta tag
+    activate User
+    User->>+Browser: navigate to codius-host.com
+    Browser->>+Site: GET codius-host.com
+    Site-->>-Browser: codius-host.com page w/ meta tag
     opt web monetization
       Browser->>+Verifier: SPSP query
       Verifier->>+Wallet: SPSP query w/ secret & nonce
@@ -27,28 +28,28 @@ sequenceDiagram
         Browser->>+Wallet: $
         Wallet-->>-Browser: receipt
         Browser-x+Site: monetizationprogress receipt
-        Site-x+Verifier: POST /receipts/{requestId} receipt
+        Site-x+Verifier: POST /balances/{requestId}:creditReceipt receipt
         deactivate Site
         Verifier->>-Verifier: credits requestId balance
       end
       Browser-x+Site: monetizationstart requestId
-      Site->>-Site: iframe src=dashboard.codius-host.com/auth=requestId
-      Browser->>+Ingress: GET dashboard.codius-host.com/auth=requestId
-      Ingress-->>-Browser: Kubernetes dashboard ui w/ requestId as Auth header
-      Browser->>+Dashboard: deploy service
-      Dashboard->>+k8s: POST /api/v1/namespaces/c8s-untrusted/codiusdeployments<br/>Authorization: Bearer requestId<br/>codius-deployment.yaml
+      Site-x-User: server=codius-host.com token=requestId
+      deactivate Browser
+      User->>+kubectl: kubectl apply -f codius-service.yaml -s codius-host.com --token=requestId
+      kubectl->>+k8s: POST /api/v1/namespaces/codius/service.core.codius.org<br/>Authorization: Bearer requestId<br/>codius-service.yaml
       k8s->>+k8sAuth: requestId
-      k8sAuth->>+Verifier: POST /receipts/{requestId}/spend
+      k8sAuth->>+Verifier: POST /balances/{requestId}:spend deploy-price
       alt sufficient balance
         Verifier-->>-k8sAuth: 200
         k8sAuth-->>-k8s: 200 "user":"codius-deploy"
-        k8s->>k8s: create CodiusDeployment
-        k8s->>k8s: crd operator creates deployment, service, ingress, etc
-        k8s-->>-Dashboard: 201
-        Dashboard-->>-Browser: "Success"
+        k8s->>k8s: create Codius Service
+        k8s->>k8s: crd operator creates deployment, service, ingress
+        k8s-->>-kubectl: 201
+        kubectl-->>User: "service.core.codius.org/codius-service created"
       end
+      deactivate kubectl
     end
-    deactivate Browser
+    deactivate User
   </div>
   <script async src="https://unpkg.com/mermaid@8.4.5/dist/mermaid.min.js"></script>
 </body>
