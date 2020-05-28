@@ -9,11 +9,11 @@ sequenceDiagram
     participant User
     participant Browser
     participant kubectl
-    participant Site as codius-host.com
+    participant Site as codius-web
     participant Verifier as Receipt Verifier
     participant Wallet as Host's Wallet
-    participant k8s as Kubernetes
-    participant k8sAuth as Authentication<br/>Token Webhook
+    participant k8s as Kubernetes API Server
+    participant k8sAuth as codius-auth
 
     activate User
     User->>+Browser: navigate to codius-host.com
