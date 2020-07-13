@@ -7,32 +7,25 @@
   <div class="mermaid">
 sequenceDiagram
   participant Browser
-  participant Ingress
-  participant Auth as codius-auth
+  participant Proxy as Codius Proxy
   participant Verifier as Receipt Verifier
   participant Site as codius-web
   participant Wallet as Host's Wallet
-  participant Deployment as Codius Deployment
+  participant Operator as Codius Operator
+  participant API as Services API
+  participant Service as Codius Service
 
   activate Browser
-  Browser->>+Ingress: GET id.codius-host.com
-  activate Ingress
-  Ingress->>+Auth: request
-  activate Auth
-  Auth->>+Verifier: POST /balances/{id}:spend requestPrice
+  Browser->>+Proxy: GET id.codius-host.com
+  activate Proxy
+  activate Proxy
+  Proxy->>+Verifier: POST /balances/{id}:spend requestPrice
   activate Verifier
-  alt sufficient balance
-    Verifier-->>-Auth: 200
-    Auth-->>-Ingress: 200
-    Ingress->>+Deployment: request
-    deactivate Ingress
-    Deployment-->>-Browser: response
-  else insufficient balance
-    Verifier-->>-Auth: 400
-    Auth-->>-Browser: 303 codius-host.com/id/402
-    deactivate Ingress
-    Browser->>+Site: GET codius-host.com/id/402
-    Site-->>-Browser: codius-host.com/id/402 page w/ meta tag
+  alt insufficient balance
+    Verifier-->>-Proxy: 400
+    Proxy->>-Site: proxy to codius-host.com/{id}/402
+    activate Site
+    Site-->>-Browser: 402 page w/ monetization tag
     opt web monetization
       Browser->>+Verifier: SPSP query
       Verifier->>+Wallet: SPSP query w/ secret & nonce
@@ -46,9 +39,29 @@ sequenceDiagram
         Verifier->>Verifier: credits service balance
         Verifier-->>-Site: 200 service balance
         alt sufficient balance
-          Site->>-Browser: redirect to id.codius-host.com
+          Site->>-Browser: reload id.codius-host.com
         end
       end
+    end
+  else sufficient balance
+    Verifier-->>-Proxy: 200
+    Proxy-x+Operator: update service's last request time
+    alt service unavailable
+      Operator->>Operator: scale up service
+      deactivate Operator
+      Proxy->>-Site: proxy to codius-host.com/{id}/503
+      activate Site
+      loop
+        Site->>+API: GET /services/{id}
+        API-->>-Site: 200 service
+        alt service available
+          Site->>-Browser: reload id.codius-host.com
+        end
+      end
+    else service available
+      Proxy->>-Service: proxy to service
+      activate Service
+      Service-->>-Browser: response
     end
   end
   deactivate Browser
