@@ -18,7 +18,7 @@ sequenceDiagram
     activate User
     User->>+Browser: navigate to codius-host.com
     Browser->>+Site: GET codius-host.com
-    Site-->>-Browser: codius-host.com page w/ meta tag
+    Site-->>-Browser: codius-host.com page w/ monetization tag
     opt web monetization
       Browser->>+Verifier: SPSP query
       Verifier->>+Wallet: SPSP query w/ secret & nonce
@@ -36,7 +36,7 @@ sequenceDiagram
       Site-x-User: server=codius-host.com token=requestId
       deactivate Browser
       User->>+kubectl: kubectl apply -f codius-service.yaml -s codius-host.com --token=requestId
-      kubectl->>+k8s: POST /api/v1/namespaces/codius/service.core.codius.org<br/>Authorization: Bearer requestId<br/>codius-service.yaml
+      kubectl->>+k8s: POST /apis/core.codius.org/v1alpha1/services<br/>Authorization: Bearer requestId<br/>codius-service.yaml
       k8s->>+k8sAuth: requestId
       k8sAuth->>+Verifier: POST /balances/{requestId}:spend deploy-price
       alt sufficient balance
