@@ -12,6 +12,7 @@ sequenceDiagram
   participant Auth as edge-auth
   participant Billing as billing
   participant prometheus
+  participant Verifier as receipt-verifier
   participant Function
 
   activate User
@@ -25,8 +26,8 @@ sequenceDiagram
   activate Billing
   Billing->>+prometheus: GET sum(gateway_function_invocation_total{function_name="user-func"})
   prometheus-->>-Billing: 200 gateway_function_invocation_total
-  Billing->>+prometheus: GET sum(gateway_function_payment_total{function_name="user-func", payment_pointer="$wallet/host"})
-  prometheus-->>-Billing: 200 gateway_function_payment_total
+  Billing->>+Verifier: GET /balances/user-func
+  Verifier-->>-Billing: 200 balance
   alt insufficient function balance
     Billing-->>-Auth: 402
     Auth-->>-Router: 402
