@@ -9,6 +9,7 @@ sequenceDiagram
   participant Browser
   participant Page as Web page
   participant Verifier as receipt-verifier
+  participant Revshare as revshare
   participant Billing as billing
   participant gateway
   participant prometheus
@@ -16,18 +17,22 @@ sequenceDiagram
 
   activate Browser
   Browser->>+Verifier: GET pay.host/user-func Accept: application/spsp4+json
-  Verifier->>+Billing: GET /paymentPointers/{user-func}
+  Verifier->>+Revshare: GET /?id=user-func
+  activate Revshare
+  Revshare->>+Billing: GET /?function=user-func
   activate Billing
   Billing->>+prometheus: GET sum(gateway_function_invocation_total{function_name="user-func"})
   prometheus-->>-Billing: 200 gateway_function_invocation_total
-  Billing->>+Verifier: GET balances/user-func
+  Billing->>+Verifier: GET /balances/user-func
   Verifier-->>-Billing: 200 balance
   alt insufficient function balance
-    Billing-->>-Verifier: 200 $wallet/host, balanceId: user-func
+    Billing-->>-Revshare: 200 { balance: <=0, requests }
+    Revshare-->>-Verifier: 200 $wallet/host, balanceId: user-func
   else sufficient balance
-    Billing->>+gateway: GET /system/function/user-func
-    gateway-->>-Billing: 200 function w/ interledger.org/payment-pointer annotation
-    Billing-->>-Verifier: 200 $wallet/user
+    Billing-->>-Revshare: 200 { balance: >0, requests }
+    Revshare->>+gateway: GET /system/function/user-func
+    gateway-->>-Revshare: 200 function w/ interledger.org/payment-pointer annotation
+    Revshare-->>-Verifier: 200 $wallet/user
   end
   Verifier->>+Wallet: SPSP query w/ secret & nonce
   Wallet-->>-Browser: destinationAddress & sharedSecret

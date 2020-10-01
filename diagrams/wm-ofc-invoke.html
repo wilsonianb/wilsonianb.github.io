@@ -22,19 +22,19 @@ sequenceDiagram
   activate Router
   Router->>+Auth: GET /q/?r=/function/user-func
   activate Auth
-  Auth->>+Billing: GET /balances/{user-func}
+  Auth->>+Billing: POST /?function=user-func
   activate Billing
   Billing->>+prometheus: GET sum(gateway_function_invocation_total{function_name="user-func"})
   prometheus-->>-Billing: 200 gateway_function_invocation_total
   Billing->>+Verifier: GET /balances/user-func
   Verifier-->>-Billing: 200 balance
   alt insufficient function balance
-    Billing-->>-Auth: 402
+    Billing-->>-Auth: 200 { balance: <=0, requests }
     Auth-->>-Router: 402
     Router->>-User: 402
     deactivate Ingress
   else sufficient function balance
-    Billing-->>-Auth: 200
+    Billing-->>-Auth: 200 { balance: >0, requests }
     Auth-->>-Router: 200
     Router->>+Function: GET /
     Function-->>-User: response
