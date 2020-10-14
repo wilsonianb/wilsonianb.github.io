@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <h1><a href="https://interledger.org/rfcs/0009-simple-payment-setup-protocol/">Simple Payment Setup Protocol (SPSP)</a></h1>
+  <h2>Basic SPSP</h2>
+  <div class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant Page as Web page
+  participant Wallet
+
+  activate Browser
+  Browser->>+Wallet: GET /user Accept: application/spsp4+json
+  Wallet-->>-Browser: destinationAddress & sharedSecret
+  loop ILP packet
+    Browser->>+Wallet: ILP prepare
+    Wallet-->>-Browser: ILP fulfill
+    Browser-xPage: monetizationprogress
+  end
+  deactivate Browser
+  </div>
+
+  <h2><a href="https://webmonetization.org/prob-revshare/">Revenue sharing</a></h2>
+  <div class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant Page as Web page
+  participant Revshare as revshare
+  participant Wallet as Wallet
+
+  activate Browser
+  Browser->>+Revshare: GET /id Accept: application/spsp4+json
+  activate Revshare
+  alt heads
+    Revshare->>+Wallet: GET /alice Accept: application/spsp4+json
+  else tails
+    Revshare->>+Wallet: GET /bob Accept: application/spsp4+json
+  end
+  Wallet-->>-Browser: destinationAddress & sharedSecret
+  deactivate Revshare
+  deactivate Revshare
+  deactivate Wallet
+  loop ILP packet
+    Browser->>+Wallet: ILP prepare
+    Wallet-->>-Browser: ILP fulfill
+    Browser-xPage: monetizationprogress
+  end
+  deactivate Browser
+  </div>
+  
+  <h2><a href="https://github.com/coilhq/receipt-verifier">Receipt Verifier</a></h2>
+  <div class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant Page as Web page
+  participant Verifier as receipt-verifier
+  participant Wallet
+
+  activate Browser
+  Browser->>+Verifier: GET /user Accept: application/spsp4+json
+  Verifier->>+Wallet: SPSP query w/ receipt secret & nonce
+  Wallet-->>-Browser: destinationAddress & sharedSecret
+  deactivate Verifier
+  loop ILP packet
+    Browser->>+Wallet: ILP prepare
+    Wallet-->>-Browser: ILP fulfill w/ receipt
+    Browser-x+Page: monetizationprogress w/ receipt
+    Page->>+Verifier: POST /receipts receipt
+    activate Verifier
+    alt valid receipt
+      Verifier-->>-Page: 201 decoded receipt
+    else invalid receipt
+      Verifier-->>-Page: 4XX
+    end
+    deactivate Page
+  end
+  deactivate Browser
+  </div>
+
+  <h2>Billing</h2>
+  <div class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant Page as Web page
+  participant Verifier as receipt-verifier
+  participant Revshare as revshare
+  participant Billing as billing
+  participant Wallet
+
+  activate Browser
+  Browser->>+Verifier: GET /id Accept: application/spsp4+json
+  Verifier->>+Revshare: GET /id
+  activate Revshare
+  Revshare->>+Billing: GET /balances/id
+  activate Billing
+  Billing-->>-Revshare: 200 balance
+  alt insufficient balance
+    Revshare-->>-Verifier: 200 $wallet/serviceprovider
+  else sufficient balance
+    Revshare-->>-Verifier: 200 $wallet/user
+  end
+  Verifier->>+Wallet: SPSP query w/ secret & nonce
+  Wallet-->>-Browser: destinationAddress & sharedSecret
+  deactivate Verifier
+  loop ILP packet
+    Browser->>+Wallet: ILP Prepare
+    Wallet-->>-Browser: ILP Fulfill w/ receipt
+    Browser-x+Page: monetizationprogress receipt
+    Page->>+Verifier: POST /receipts receipt
+    activate Verifier
+    alt valid receipt
+      Verifier-->>-Page: 201 decoded receipt
+    else invalid receipt
+      Verifier-->>-Page: 4XX
+    end
+    deactivate Page
+  end
+  deactivate Browser
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.7.0/dist/mermaid.min.js"></script>
+</body>
+</html>
