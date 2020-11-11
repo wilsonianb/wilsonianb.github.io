@@ -11,8 +11,8 @@ sequenceDiagram
   participant Router as edge-router
   participant Auth as edge-auth
   participant Billing as billing
+  participant Redis
   participant gateway
-  participant Verifier as receipt-verifier
   participant Function
 
   activate User
@@ -24,14 +24,14 @@ sequenceDiagram
   activate Auth
   Auth->>+Billing: POST /?function=user-func
   activate Billing
-  Billing->>+Verifier: GET /balances/user-func
-  Verifier-->>-Billing: 200 balance
+  Billing->>+Redis: GET balances|user-func
+  Redis-->>-Billing: balance
   Billing->>+gateway: GET /system/function/user-func
   gateway-->>-Billing: 200 function w/ invocationCount
   alt insufficient function balance
     Billing-->>-Auth: 200 { balance: <=0, requests }
-    Auth-->>-Router: 402
-    Router->>-User: 402
+    Auth-->>-Router: 307 /dashboard/user/func
+    Router->>-User: 307 /dashboard/user/func
     deactivate Ingress
   else sufficient function balance
     Billing-->>-Auth: 200 { balance: >0, requests }

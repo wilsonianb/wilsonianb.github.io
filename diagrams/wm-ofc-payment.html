@@ -8,9 +8,11 @@
 sequenceDiagram
   participant Browser
   participant Page as Web page
+  participant VerifierFn as verifier wrapper
   participant Verifier as receipt-verifier
   participant Revshare as revshare
   participant Billing as billing
+  participant Redis
   participant gateway
   participant Wallet
 
@@ -20,13 +22,13 @@ sequenceDiagram
   activate Revshare
   Revshare->>+Billing: GET /?function=user-func
   activate Billing
+  Billing->>+Redis: GET balances|user-func
+  Redis-->>-Billing: balance
   Billing->>+gateway: GET /system/function/user-func
   gateway-->>-Billing: 200 function w/ invocationCount
-  Billing->>+Verifier: GET /balances/user-func
-  Verifier-->>-Billing: 200 balance
   alt insufficient function balance
     Billing-->>-Revshare: 200 { balance: <=0, requests }
-    Revshare-->>-Verifier: 200 $wallet/host, balanceId: user-func
+    Revshare-->>-Verifier: 200 $wallet/host
   else sufficient balance
     Billing-->>-Revshare: 200 { balance: >0, requests }
     Revshare->>+gateway: GET /system/function/user-func
@@ -40,13 +42,19 @@ sequenceDiagram
     Browser->>+Wallet: $ $ $
     Wallet-->>-Browser: receipt
     Browser-x+Page: monetizationprogress receipt
-    Page->>+Verifier: POST pay.host/receipts receipt
+    Page->>+VerifierFn: POST pay.host/verify receipt
+    activate VerifierFn
+    VerifierFn->>+Verifier: POST /verify receipt
     activate Verifier
     alt valid receipt
-      Verifier->>Verifier: increment /balances/{balanceId} by receiptValue
-      Verifier-->>-Page: 201 decoded receipt
+      Verifier-->>-VerifierFn: 200 { amount, id, spspEndpoint }
+      alt spspEndpoint == $wallet/host
+        VerifierFn-xRedis: INCRBY balances|id amount
+      end
+      VerifierFn-->>-Page: 200 { amount, spspEndpoint }
     else invalid receipt
-      Verifier-->>-Page: 4XX
+      Verifier-->>-VerifierFn: 4XX
+      VerifierFn-->>-Page: 4XX
     end
     deactivate Page
   end
