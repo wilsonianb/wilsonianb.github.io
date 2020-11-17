@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+sequenceDiagram
+  participant User as o-|-<
+  participant Ingress as ingress-nginx
+  participant Router as edge-router
+  participant Auth as edge-auth
+  participant Billing as billing
+  participant Redis
+  participant gateway
+  participant Function
+
+  activate User
+  User->>+Ingress: GET user.host/func
+  activate Ingress
+  Ingress->>+Router: GET /
+  activate Router
+  Router->>+Auth: GET /q/?r=/function/user-func
+  activate Auth
+  Auth->>+Billing: POST /?function=user-func
+  activate Billing
+  Billing->>+Redis: GET balances|user-func
+  Redis-->>-Billing: balance
+  Billing->>+gateway: GET /system/function/user-func
+  gateway-->>-Billing: 200 function w/ invocationCount
+  alt insufficient function balance
+    Billing-->>-Auth: 200 { balance: <=0, requests }
+    Auth-->>-Router: 307 /dashboard/user/func
+    Router->>-User: 307 /dashboard/user/func
+    deactivate Ingress
+  else sufficient function balance
+    Billing-->>-Auth: 200 { balance: >0, requests }
+    Auth-->>-Router: 200
+    Router->>+Function: GET /
+    Function-->>-User: response
+    deactivate Router
+    deactivate Ingress
+  end
+  deactivate User
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.7.0/dist/mermaid.min.js"></script>
+</body>
+</html>

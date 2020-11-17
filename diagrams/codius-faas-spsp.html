@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant Verifier as receipt-verifier
+  participant Revshare as revshare
+  participant Billing as billing
+  participant Redis
+  participant gateway
+  participant Wallet
+
+  activate Browser
+  Browser->>+Verifier: GET pay.host/user-func Accept: application/spsp4+json
+  Verifier->>+Revshare: GET /?id=user-func
+  activate Revshare
+  Revshare->>+Billing: GET /?function=user-func
+  activate Billing
+  Billing->>+Redis: GET balances|user-func
+  Redis-->>-Billing: balance
+  Billing->>+gateway: GET /system/function/user-func
+  gateway-->>-Billing: 200 function w/ invocationCount
+  alt insufficient function balance
+    Billing-->>-Revshare: 200 { balance: <=0, requests }
+    Revshare-->>-Verifier: 200 $wallet/host
+  else sufficient balance
+    Billing-->>-Revshare: 200 { balance: >0, requests }
+    Revshare->>+gateway: GET /system/function/user-func
+    gateway-->>-Revshare: 200 function w/ interledger.org/payment-pointer annotation
+    Revshare-->>-Verifier: 200 $wallet/user
+  end
+  Verifier->>+Wallet: SPSP query w/ secret & nonce
+  Wallet-->>-Browser: destinationAddress & sharedSecret
+  deactivate Verifier
+  deactivate Browser
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.7.0/dist/mermaid.min.js"></script>
+</body>
+</html>

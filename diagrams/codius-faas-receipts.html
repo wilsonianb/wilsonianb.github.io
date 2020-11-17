@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <div class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant Page as Web page
+  participant VerifierFn as verifier wrapper
+  participant Verifier as receipt-verifier
+  participant Redis
+  participant Wallet
+
+  activate Browser
+  loop ILP packet
+    Browser->>+Wallet: $ $ $
+    Wallet-->>-Browser: receipt
+    Browser-x+Page: monetizationprogress receipt
+    Page->>+VerifierFn: POST pay.host/verify receipt
+    activate VerifierFn
+    VerifierFn->>+Verifier: POST /verify receipt
+    activate Verifier
+    alt valid receipt
+      Verifier-->>-VerifierFn: 200 { amount, id, spspEndpoint }
+      alt spspEndpoint == $wallet/host
+        VerifierFn-xRedis: INCRBY balances|id amount
+      end
+      VerifierFn-->>-Page: 200 { amount, spspEndpoint }
+    else invalid receipt
+      Verifier-->>-VerifierFn: 4XX
+      VerifierFn-->>-Page: 4XX
+    end
+    deactivate Page
+  end
+  deactivate Browser
+  </div>
+  <script async src="https://unpkg.com/mermaid@8.7.0/dist/mermaid.min.js"></script>
+</body>
+</html>
